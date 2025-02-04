@@ -9,8 +9,8 @@ pub enum RLPItem<T: traits::EndianWrite> {
     List(Box<[T]>),
 }
 
-impl<T: traits::EndianWrite + Clone> From<[T; 0]> for RLPItem<T> {
-    fn from(value: [T; 0]) -> Self {
+impl<T: traits::EndianWrite + Clone, const C: usize> From<[T; C]> for RLPItem<T> {
+    fn from(value: [T; C]) -> Self {
         let boxed: Box<[T]> = value.into();
         Self::List( boxed )
     }
@@ -182,3 +182,14 @@ fn endianwrite_basic_case_1024() {
     let first_three_bytes: &[u8] = &sized_1024[0..=2];
     assert_eq!(first_three_bytes.encode_hex::<String>(), "b90400");
 }
+
+/*
+#[test]
+fn endianwrite_basic_case_set_three() {
+    use crate::traits::EndianWrite;
+    use hex::ToHex;
+    
+    let sized_set_theoretical_three: Box<[u8]> = RLPItem::<[RLPItem<&[u8]>]>::from(&[ [], [[]], [ [], [[]] ] ]).to_be_bytes().into();
+    assert_eq!(sized_set_theoretical_three.encode_hex::<String>(), "c7c0c1c0c3c0c1c0");
+}
+*/
