@@ -67,9 +67,7 @@ impl<T: traits::EndianWrite<Output = Box<[u8]>>> traits::EndianWrite for RLPItem
         let to_box: Vec<u8> = match self {
             RLPItem::Bytes(bytes) => {
                 let len = bytes.len();
-                if len == 0 {
-                    [].into()
-                } else if len == 1 {
+                if len == 1 {
                     bytes.to_vec()
                 } else if len <= 55 {
                     let mut value = Vec::new();
@@ -132,6 +130,16 @@ fn endianwrite_basic_case_empty_list() {
     let value: [&str; 0] = [];
     let sized_1: Box<[u8]> = RLPItem::from(value).to_be_bytes().into();
     assert_eq!(sized_1.encode_hex::<String>(), "c0");
+}
+
+#[test]
+fn endianwrite_basic_case_empty_string() {
+    use crate::traits::EndianWrite;
+    use crate::RLPItem;
+    use hex::ToHex;
+    let value: &str = "";
+    let sized: Box<[u8]> = RLPItem::<&str>::from(value).to_be_bytes().into();
+    assert_eq!(sized.encode_hex::<String>(), "80");
 }
 
 #[test]
