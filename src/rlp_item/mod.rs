@@ -9,6 +9,13 @@ pub enum RLPItem<T: traits::EndianWrite> {
     List(Box<[T]>),
 }
 
+impl<T: traits::EndianWrite + Clone> From<[T; 0]> for RLPItem<T> {
+    fn from(value: [T; 0]) -> Self {
+        let boxed: Box<[T]> = value.into();
+        Self::List( boxed )
+    }
+}
+
 impl<T: traits::EndianWrite> From<&[u8]> for RLPItem<T> {
     fn from(value: &[u8]) -> Self {
         Self::Bytes(Box::from(value))
@@ -120,9 +127,10 @@ impl<T: traits::EndianWrite<Output = Box<[u8]>>> traits::EndianWrite for RLPItem
 #[test]
 fn endianwrite_basic_case_empty_list() {
     use crate::traits::EndianWrite;
+    use crate::RLPItem;
     use hex::ToHex;
-    let value: &str = "";
-    let sized_1: Box<[u8]> = RLPItem::<&str>::from(value).to_be_bytes().into();
+    let value: [&str; 0] = [];
+    let sized_1: Box<[u8]> = RLPItem::from(value).to_be_bytes().into();
     assert_eq!(sized_1.encode_hex::<String>(), "c0");
 }
 
