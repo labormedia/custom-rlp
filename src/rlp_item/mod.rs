@@ -66,7 +66,7 @@ impl traits::EndianWrite for RLPItem {
 }
 
 #[test]
-fn endianwrite_basic_case() {
+fn endianwrite_basic_case_1024() {
     use crate::traits::EndianWrite;
     use hex::ToHex;
     
