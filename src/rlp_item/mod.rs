@@ -143,6 +143,16 @@ fn endianwrite_basic_case_empty_string() {
 }
 
 #[test]
+fn endianwrite_basic_case_hello_world() {
+    use crate::traits::EndianWrite;
+    use crate::RLPItem;
+    use hex::ToHex;
+    let value: &str = "hello world";
+    let sized: Box<[u8]> = RLPItem::<&str>::from(value).to_be_bytes().into();
+    assert_eq!(sized.encode_hex::<String>(), "8b68656c6c6f20776f726c64");
+}
+
+#[test]
 fn endianwrite_basic_case_dog() {
     use crate::traits::EndianWrite;
     use hex::ToHex;
