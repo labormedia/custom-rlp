@@ -158,9 +158,9 @@ fn endianwrite_basic_case_lorem_ipsum() {
     let value =  "Lorem ipsum dolor sit amet, consectetur adipisicing elit";
     let sized: Box<[u8]> = RLPItem::<&str>::from(value).to_be_bytes().into();
     let first_three_bytes: &[u8] = &sized[0..=2];
-    let last_byte: &u8 = &sized.last().unwrap();
+    let last_byte: &[u8; 3] = sized.last_chunk::<3>().unwrap();
     assert_eq!(first_three_bytes.encode_hex::<String>(), "b8384c");
-    assert_eq!(last_byte, &b't');
+    assert_eq!(last_byte, b"lit");
 }
 
 #[test]
