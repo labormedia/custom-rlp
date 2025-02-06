@@ -1,6 +1,10 @@
 use std::fmt::Debug;
+use std::collections::VecDeque;
 use crate::{
-    traits,
+    traits::{
+        self,
+        EndianWrite,
+    },
     error,
     macros::nest,
     macros::nested_list,
@@ -135,12 +139,8 @@ impl<const C: usize> traits::EndianWrite for [u8;C] {
     }
 }
 
-impl traits::EndianWrite for RLPItem {
-    type Output = Box<[u8]>;
-    fn to_le_bytes(&self) -> Self::Output {
-        unimplemented!()
-    }
-    fn to_be_bytes(&self) -> Self::Output {
+impl RLPItem {
+    fn to_be_bytes_with_total_traversal_length<'a>(&self, total_size_acc: &'a mut usize) -> (Box<[u8]>, &'a mut usize) {
         let to_box: Vec<u8> = match self {
             RLPItem::Bytes(bytes) => {
                 let len = bytes.len();
@@ -167,15 +167,19 @@ impl traits::EndianWrite for RLPItem {
             },
             RLPItem::List(list) => {
                 let len = list.len();
-                if len <= 55 {
-                    let mut value = Vec::new();
-                    value.push(0xc0+len as u8);
-                    let items = list.into_iter().fold( Vec::new(), |mut acc, x| { 
-                        acc.extend_from_slice(&*x.to_be_bytes());
+                        let items = list.into_iter().fold( Vec::new(), |mut acc: Vec<u8>, x: &RLPItem| { 
+                        let (bytes, size) = x.to_be_bytes_with_total_traversal_length(total_size_acc); // this folding accumulates the total length of the encoding
+                        acc.extend_from_slice(&*bytes); 
                         acc
                     });
+                
+
+                if len <= 55 {
+                    let mut value = Vec::new();
+                    *total_size_acc += len;
+                    value.push(0xc0+*total_size_acc as u8);
                     value.extend_from_slice(&items);
-                    value                    
+                    value.into()                    
                 } else {
                     let mut value = Vec::new();
                     let len_list = len
@@ -184,6 +188,7 @@ impl traits::EndianWrite for RLPItem {
                         .skip_while(|&byte| byte == 0)
                         .collect::<Vec<u8>>();
                     let len_list_len = len_list.len();
+                    *total_size_acc += len_list_len;
                     value.extend_from_slice(&[0xf7+len_list_len as u8]);
                     value.extend_from_slice(&len_list);
                     let items = list.into_iter().fold( Vec::new(), |mut acc, x| { 
@@ -195,7 +200,20 @@ impl traits::EndianWrite for RLPItem {
                 }
             }
         };
-        Box::from(to_box.as_slice())
+        (Box::from(to_box.as_slice()), total_size_acc)
+    }
+}
+
+impl traits::EndianWrite for RLPItem {
+    type Output = Box<[u8]>;
+    fn to_le_bytes(&self) -> Self::Output {
+        unimplemented!()
+    }
+    fn to_be_bytes(&self) -> Self::Output {
+        let mut total_size = 0;
+        let (output, total_size) = self.to_be_bytes_with_total_traversal_length(&mut total_size);
+        println!("Total size: {}", total_size);
+        output
     }
 }
 
@@ -278,20 +296,43 @@ fn from_nested_basic() {
             R::from(["squirrel", "dog", "cat"])
         ]),
     ]);
+    // at least one element explicitly converted without type inference is needed to progress with all Into instances
     let same_nested_data: RLPItem = [
-        R::from(&[]),
-        R::from(["cat"]),
+        (&[]).into(),
+        (["cat"]).into(),
         "cat".into(),
         R::from([
-            R::from([5_u8, 6_u8, 7_u8, 8_u8]),
-            R::from([40, 50, 60]),
-            R::from([
-                R::from([100, 200, 255]),
+            [5_u8, 6_u8, 7_u8, 8_u8].into(),
+            [40, 50, 60].into(),
+            [
+                [100, 200, 255].into(),
                 R::from([0, 1, 2, 3]),
-            ]),
+            ].into(),
             R::from("squirrel"),
-            R::from(["squirrel", "dog", "cat"])
+            ["squirrel", "dog", "cat"].into(),
         ]),
     ].into();
     assert_eq!(nested_data, same_nested_data);
+}
+
+#[test]
+fn set_theoretical_three_encoding() {
+    use hex::ToHex;
+    use crate::traits::EndianWrite;
+    // Using a closure as a simple builder instead of cloning.
+    let empty = || RLPItem::from(&[]);
+    let value: RLPItem = [ 
+        empty(), 
+        [
+            empty()
+        ].into(), 
+        [ 
+            empty(), 
+            [
+                empty()
+            ].into() 
+        ].into() 
+    ].into();
+    //assert_eq!(value.to_be_bytes(), [ 0xc7, 0xc0, 0xc1, 0xc0, 0xc3, 0xc0, 0xc1, 0xc0 ].into());
+    assert_eq!(value.to_be_bytes().encode_hex::<String>(), "c7c0c1c0c3c0c1c0");
 }
